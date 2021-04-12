@@ -2,16 +2,16 @@
 > Pin your existing IPFS files stored in Infura in 3 steps.
 
 ## Step 1 - Create your Infura IPFS Project
-Register a new account at https://infura.io (if you don't have one already), and set up your IPFS project following the instructions.
+To interact with the Infura IPFS API, you need to [register your account](https://infura.io/register) and set up your IPFS project.
 
-At the end of the process you will be redirected to the settings page where you find your credentials:
-- PROJECT_ID
-- PROJECT_SECRET
+After the registration, you will be redirected to the settings page, where you find your credentials to authenticate with:
+- **PROJECT_ID**
+- **PROJECT_SECRET**
 
 ![ipfs-copy Infura credentials settings page](./ipfs-copy-tutorial-creds.png)
 
-## Step 2 - Define a file with CIDs you want to migrate/pin
-Prepare a file with CIDs separated by a line-break character `\n`.
+## Step 2 - Prepare a migration file
+Create a file containing IPFS CIDs separated by a line-break character `\n`.
 
 Example file:
 ```
@@ -32,10 +32,10 @@ make install
 ipfs-copy --file=/home/xxx/Documents/ipfs-cids.txt --project_id=<YOUR_PROJECT_ID> --project_secret=<YOUR_PROJECT_SECRET>
 ```
 - optional flag `--api_url` defines the target, destination node to pin the files (**default:** https://ipfs.infura.io:5001)
-- optional flag `--workers` defines how many CIDs should be pinned in parallel to speed-up files with many CIDs (**default:** 5)
+- optional flag `--workers` defines how many CIDs to pin in parallel to speed-up files with many CIDs (**default:** 5)
 
 ### Run it using ENV values
-The `.env` files contains the following env variables:
+The `.env` file contains the following env variables:
 - IC_API_URL
 - IC_FILE
 - IC_PROJECT_ID
@@ -50,4 +50,6 @@ source .env && ipfs-copy
 
 What's going to happen?
 
-The `ipfs-copy` command will read your file with all the IPFS hashes (CIDs), and pin them to your Infura IPFS project in parallel with multiple workers for optimal performance.
+The `ipfs-copy` command will read your file with all the IPFS hashes (CIDs) and pin them to your Infura IPFS project in parallel with multiple workers for optimal performance.
+
+Done! You have completed the migration to the new IPFS service!
