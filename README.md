@@ -21,9 +21,17 @@ QmUsQxC5bsgX53WhQ11DkxyB4uPYLEpdgmidFhGgUFK5aK
 ```
 
 ## Step 3 - Execute the `ipfs-copy` command to pin your files
-Build the `ipfs-copy` tool:
+Build the `ipfs-copy` tool. 
+
+Using `go get`:
 ```bash
 go get -u github.com/INFURA/ipfs-copy
+```
+
+Cloning the source code manually and compiling it:
+```
+git clone https://github.com/INFURA/ipfs-copy.git
+cd ipfs-copy
 make install
 ```
 
