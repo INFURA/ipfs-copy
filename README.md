@@ -1,6 +1,10 @@
 # IPFS Copy
 > Pin your existing IPFS files stored in Infura in 3 steps.
 
+`ipfs-copy` is a migration tool for existing Infura users hosting their files on IPFS nodes in the last months/years and want to migrate to the new, more reliable, performant Infura IPFS service with all the latest features.
+
+You can **pin all your existing files**, currently hosted at Infura, **to the new service** with one command: `ipfs-copy.`
+
 ## Step 1 - Create your Infura IPFS Project
 To interact with the Infura IPFS API, you need to [register your account](https://infura.io/register) and set up your IPFS project.
 
