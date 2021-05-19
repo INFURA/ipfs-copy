@@ -17,7 +17,7 @@ const DefaultWorkersCount = 5
 
 type Config struct {
 	ApiUrl        string `env:"IC_API_URL"        cli:"api_url"`
-	File          string `env:"IC_FILE"           cli:"file"`
+	File          string `env:"IC_CIDS"           cli:"cids"`
 	Workers       int    `env:"IC_WORKERS"        cli:"workers"`
 	ProjectID     string `env:"IC_PROJECT_ID"     cli:"project_id"`
 	ProjectSecret string `env:"IC_PROJECT_SECRET" cli:"project_secret"`
@@ -66,7 +66,7 @@ func mustParseConfigFromEnv() Config {
 	}
 
 	if len(cfg.File) == 0 {
-		fmt.Println("IPFS Copy requires IC_FILE env var or --file flag to be defined.")
+		fmt.Println("IPFS Copy requires IC_CIDS env var or --cids flag to be defined.")
 		os.Exit(1)
 	}
 
