@@ -26,7 +26,7 @@ make install
 ## Step 3 - Migrate your content
 ### Run `ipfs-copy` using flags
 ```bash
-ipfs-copy --ipfs-source-api-url=http://localhost:5001 --project_id=<YOUR_PROJECT_ID> --project_secret=<YOUR_PROJECT_SECRET>
+ipfs-copy --ipfs_source_api_url=http://localhost:5001 --project_id=<YOUR_PROJECT_ID> --project_secret=<YOUR_PROJECT_SECRET>
 ```
 - optional flag `--workers` defines how many pins to copy in parallel (**default:** 5)
 
