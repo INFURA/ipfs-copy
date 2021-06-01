@@ -22,6 +22,14 @@ type Config struct {
 	Workers       int    `env:"IC_WORKERS"             cli:"workers"`
 	ProjectID     string `env:"IC_PROJECT_ID"          cli:"project_id"`
 	ProjectSecret string `env:"IC_PROJECT_SECRET"      cli:"project_secret"`
+
+	// Helper settings
+
+	// IsFileCopy is for existing users migration, pinning of files already existing on Infura IPFS nodes
+	IsFileCopy bool
+
+	// IsSourceAPICopy is for new users migrating their content from other IPFS nodes to Infura
+	IsSourceAPICopy bool
 }
 
 func main() {
@@ -69,6 +77,14 @@ func mustParseConfigFromEnv() Config {
 	if len(cfg.File) == 0 && len(cfg.SourceAPI) == 0 {
 		fmt.Println("IPFS Copy requires (IC_CIDS, --cids) OR (IC_IPFS_SOURCE_API_URL, --ipfs_source_api_url) to be defined.")
 		os.Exit(1)
+	}
+
+	if len(cfg.File) > 0 {
+		cfg.IsFileCopy = true
+		cfg.IsSourceAPICopy = false
+	} else {
+		cfg.IsFileCopy = false
+		cfg.IsSourceAPICopy = true
 	}
 
 	if len(cfg.ProjectID) == 0 {
