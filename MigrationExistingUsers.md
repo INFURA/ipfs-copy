@@ -33,13 +33,16 @@ cd ipfs-copy
 make install
 ```
 
-### Run it using flags
+### Run it
+The `ipfs-copy` command will read your file with all the IPFS hashes (CIDs) and pin them to your Infura IPFS project in parallel with multiple workers for optimal performance.
+
+#### Using flags
 ```bash
 ipfs-copy --cids=/home/xxx/Documents/ipfs-cids.txt --project_id=<YOUR_PROJECT_ID> --project_secret=<YOUR_PROJECT_SECRET>
 ```
 - optional flag `--workers` defines how many CIDs to pin in parallel (**default:** 5)
 
-### Run it using ENV values
+#### Using ENV values
 The `.env` file contains the following env variables:
 - IC_CIDS
 - IC_PROJECT_ID
@@ -51,9 +54,5 @@ cp existing-users-sample.env .env
 
 source .env && ipfs-copy
 ```
-
-What's going to happen?
-
-The `ipfs-copy` command will read your file with all the IPFS hashes (CIDs) and pin them to your Infura IPFS project in parallel with multiple workers for optimal performance.
 
 Done! You have completed the migration to the new IPFS service!

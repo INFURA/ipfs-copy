@@ -24,6 +24,8 @@ make install
 ```
 
 ## Step 3 - Migrate your content
+The `ipfs-copy` command **will iterate all pins from the source node, copy the blocks and then pin them** to your Infura IPFS project in parallel with multiple workers for optimal performance.
+
 ### Run `ipfs-copy` using flags
 ```bash
 ipfs-copy --ipfs_source_api_url=http://localhost:5001 --project_id=<YOUR_PROJECT_ID> --project_secret=<YOUR_PROJECT_SECRET>
@@ -42,9 +44,5 @@ cp new-self-hosted-users-sample.env .env
 
 source .env && ipfs-copy
 ```
-
-What's going to happen?
-
-The `ipfs-copy` command will iterate all pins from the source node, copy the blocks and then pin them to your Infura IPFS project in parallel with multiple workers for optimal performance.
 
 Done! You have migrated your content to Infura IPFS service!
