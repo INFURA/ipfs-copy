@@ -28,13 +28,13 @@ The `ipfs-copy` command **will iterate all pins from the source node, copy the b
 
 ### Run `ipfs-copy` using flags
 ```bash
-ipfs-copy --ipfs_source_api_url=http://localhost:5001 --project_id=<YOUR_PROJECT_ID> --project_secret=<YOUR_PROJECT_SECRET>
+ipfs-copy --source-api-url=http://localhost:5001 --project-id=<YOUR_PROJECT_ID> --project-secret=<YOUR_PROJECT_SECRET>
 ```
 - optional flag `--workers` defines how many pins to copy in parallel (**default:** 5)
 
 ### Run `ipfs-copy` using ENV variables
 The `.env` contains:
-- IC_IPFS_SOURCE_API_URL
+- IC_SOURCE_API_URL
 - IC_PROJECT_ID
 - IC_PROJECT_SECRET
 - IC_WORKERS

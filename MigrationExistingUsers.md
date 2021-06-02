@@ -38,7 +38,7 @@ The `ipfs-copy` command will read your file with all the IPFS hashes (CIDs) and 
 
 #### Using flags
 ```bash
-ipfs-copy --cids=/home/xxx/Documents/ipfs-cids.txt --project_id=<YOUR_PROJECT_ID> --project_secret=<YOUR_PROJECT_SECRET>
+ipfs-copy --cids=/home/xxx/Documents/ipfs-cids.txt --project-id=<YOUR_PROJECT_ID> --project-secret=<YOUR_PROJECT_SECRET>
 ```
 - optional flag `--workers` defines how many CIDs to pin in parallel (**default:** 5)
 
