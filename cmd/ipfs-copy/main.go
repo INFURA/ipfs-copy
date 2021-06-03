@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"os"
 
@@ -12,6 +13,7 @@ import (
 
 const DefaultApiUrl = "https://ipfs.infura.io:5001"
 const DefaultWorkersCount = 5
+const Version = "1.0.0"
 
 type Config struct {
 	ApiUrl        string `env:"IC_API_URL"        cli:"api-url"`
@@ -32,6 +34,8 @@ type Config struct {
 }
 
 func main() {
+	AddVersionCmd()
+
 	cfg := mustParseConfigFromEnv()
 	infuraShell := ipfsApi.NewShellWithClient(cfg.ApiUrl, NewClient(cfg.ProjectID, cfg.ProjectSecret))
 
@@ -108,6 +112,14 @@ func PumpBlocksAndCopyPins(cfg Config, infuraShell *ipfsApi.Shell, failedCIDsWri
 	log.Printf("[INFO] Successfully pinned %d CIDs\n", successPinsCount)
 	log.Printf("[INFO] Skipped indirect %d CIDs\n", skippedIndirectPinsCount)
 	log.Printf("[INFO] Failed to pin %d CIDs\n", failedPinsCount)
+}
+
+func AddVersionCmd() {
+	// Support for `ipfs-copy version` command:
+	if len(os.Args) > 1 && os.Args[1] == "version" {
+		fmt.Printf("ipfs-copy version: %v\n", Version)
+		os.Exit(0)
+	}
 }
 
 func mustParseConfigFromEnv() Config {
