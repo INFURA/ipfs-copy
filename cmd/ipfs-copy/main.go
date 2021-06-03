@@ -35,7 +35,7 @@ func main() {
 	cfg := mustParseConfigFromEnv()
 	infuraShell := ipfsApi.NewShellWithClient(cfg.ApiUrl, NewClient(cfg.ProjectID, cfg.ProjectSecret))
 
-	// Validates the credentials before spawning all the works
+	// Validates the credentials before spawning all the workers
 	_, _, err := infuraShell.Version()
 	if err != nil {
 		log.Fatalf("[ERROR] %v\n", err)
