@@ -45,6 +45,8 @@ func main() {
 		log.Fatalf("[ERROR] %v\n", err)
 	}
 
+	progressWriter := ipfsPump.NewProgressWriter()
+
 	var failedCIDsWriter ipfsPump.FailedBlocksWriter
 	if cfg.FileFailed == "" {
 		failedCIDsWriter = ipfsPump.NewNullableFileEnumeratorWriter()
@@ -69,7 +71,15 @@ func main() {
 	}
 
 	if cfg.IsSourceAPICopy {
-		PumpBlocksAndCopyPins(cfg, infuraShell, failedCIDsWriter)
+		PumpBlocksAndCopyPins(cfg, infuraShell, failedCIDsWriter, progressWriter)
+		os.Exit(0)
+	}
+}
+
+func AddVersionCmd() {
+	// Support for `ipfs-copy version` command:
+	if len(os.Args) > 1 && os.Args[1] == "version" {
+		fmt.Printf("ipfs-copy version: %v\n", Version)
 		os.Exit(0)
 	}
 }
@@ -94,13 +104,13 @@ func PinCIDsFromFile(cfg Config, infuraShell *ipfsApi.Shell, failedPinsWriter ip
 	log.Printf("[INFO] Failed to pin %d CIDs\n", failedPinsCount)
 }
 
-func PumpBlocksAndCopyPins(cfg Config, infuraShell *ipfsApi.Shell, failedCIDsWriter ipfsPump.FailedBlocksWriter) {
+func PumpBlocksAndCopyPins(cfg Config, infuraShell *ipfsApi.Shell, failedCIDsWriter ipfsPump.FailedBlocksWriter, progressWriter ipfsPump.ProgressWriter) {
 	pinEnum := ipfsPump.NewAPIPinEnumerator(cfg.SourceAPI, true)
 	blocksColl := ipfsPump.NewAPICollector(cfg.SourceAPI)
-	drain := ipfsPump.NewAPIDrainWithShell(infuraShell)
+	drain := ipfsPump.NewCountedDrain(ipfsPump.NewAPIDrainWithShell(infuraShell))
 
 	// Copy all the blocks
-	ipfsPump.PumpIt(pinEnum, blocksColl, drain, uint(cfg.Workers), failedCIDsWriter)
+	ipfsPump.PumpIt(pinEnum, blocksColl, drain, failedCIDsWriter, progressWriter, uint(cfg.Workers))
 	log.Printf("[INFO] Copied %d blocks\n", drain.SuccessfulBlocksCount())
 
 	// Once **all the blocks are copied**, pin the RECURSIVE + DIRECT pins (not before)
@@ -112,14 +122,6 @@ func PumpBlocksAndCopyPins(cfg Config, infuraShell *ipfsApi.Shell, failedCIDsWri
 	log.Printf("[INFO] Successfully pinned %d CIDs\n", successPinsCount)
 	log.Printf("[INFO] Skipped indirect %d CIDs\n", skippedIndirectPinsCount)
 	log.Printf("[INFO] Failed to pin %d CIDs\n", failedPinsCount)
-}
-
-func AddVersionCmd() {
-	// Support for `ipfs-copy version` command:
-	if len(os.Args) > 1 && os.Args[1] == "version" {
-		fmt.Printf("ipfs-copy version: %v\n", Version)
-		os.Exit(0)
-	}
 }
 
 func mustParseConfigFromEnv() Config {
