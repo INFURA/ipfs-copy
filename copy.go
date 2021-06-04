@@ -33,7 +33,9 @@ func PinCIDsFromFile(file io.ReadSeeker, workers int, shell *ipfsShell.Shell, fa
 				} else {
 					failedPinsCount++
 					_, err := failedPinsWriter.Write(c)
-					log.Printf("[ERROR] Failed writing pinning error to file for CID: '%v'. %v\n", c, err)
+					if err != nil {
+						log.Printf("[ERROR] Failed writing pinning error to file for CID: '%v'. %v\n", c, err)
+					}
 					continue
 				}
 			}
