@@ -3,7 +3,7 @@ module github.com/INFURA/ipfs-copy
 go 1.15
 
 require (
-	github.com/INFURA/ipfs-pump v0.0.0-20200903220729-9f7ba1ade71e
+	github.com/INFURA/ipfs-pump v1.2.0
 	github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751 // indirect
 	github.com/alecthomas/units v0.0.0-20210208195552-ff826a37aa15 // indirect
 	github.com/gravitational/configure v0.0.0-20180808141939-c3428bd84c23
@@ -17,5 +17,3 @@ require (
 	golang.org/x/net v0.0.0-20210331212208-0fccb6fa2b5c // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
-
-replace github.com/INFURA/ipfs-pump => /home/web3coach/go/src/github.com/INFURA/ipfs-pump
