@@ -38,7 +38,7 @@ func main() {
 	AddVersionCmd()
 
 	ctx := context.Background()
-	cfg := mustParseConfigFromEnv()
+	cfg := mustPrepareConfig()
 	infuraShell := ipfsApi.NewShellWithClient(cfg.ApiUrl, NewClient(cfg.ProjectID, cfg.ProjectSecret))
 
 	// Validates the credentials before spawning all the workers
@@ -117,17 +117,17 @@ func PumpBlocksAndCopyPins(ctx context.Context, cfg Config, infuraShell *ipfsApi
 	log.Printf("[INFO] Copied %d blocks\n", drain.SuccessfulBlocksCount())
 
 	// Once **all the blocks are copied**, pin the RECURSIVE + DIRECT pins (not before)
-	successPinsCount, skippedIndirectPinsCount, failedPinsCount, err := ipfsCopy.PinCIDsFromSource(ctx, cfg.SourceAPI, cfg.Workers, infuraShell, failedCIDsWriter)
+	successPinsCount, _, failedPinsCount, err := ipfsCopy.PinCIDsFromSource(ctx, cfg.SourceAPI, cfg.Workers, infuraShell, failedCIDsWriter)
 	if err != nil {
 		log.Fatalf("[ERROR] %v\n", err)
 	}
 
 	log.Printf("[INFO] Successfully pinned %d CIDs\n", successPinsCount)
-	log.Printf("[INFO] Skipped indirect %d CIDs\n", skippedIndirectPinsCount)
+	//log.Printf("[INFO] Skipped indirect %d CIDs\n", skippedIndirectPinsCount)
 	log.Printf("[INFO] Failed to pin %d CIDs\n", failedPinsCount)
 }
 
-func mustParseConfigFromEnv() Config {
+func mustPrepareConfig() Config {
 	var cfg Config
 
 	err := configure.ParseEnv(&cfg)
