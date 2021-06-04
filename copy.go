@@ -26,15 +26,16 @@ func PinCIDsFromFile(file io.ReadSeeker, workers int, shell *ipfsShell.Shell, fa
 	for w := 1; w <= workers; w++ {
 		wg.Add(1)
 		go func() {
-			for c := range cids {
-				ok := pinCid(c, shell)
+			for cid := range cids {
+				ok := pinCid(cid, shell)
 				if ok {
 					successPinsCount++
 				} else {
+					log.Printf("[ERROR] Failed pinning CID: '%v'\n", cid)
 					failedPinsCount++
-					_, err := failedPinsWriter.Write(c)
+					_, err := failedPinsWriter.Write(cid)
 					if err != nil {
-						log.Printf("[ERROR] Failed writing pinning error to file for CID: '%v'. %v\n", c, err)
+						log.Printf("[ERROR] Failed writing pinning error to file for CID: '%v'. %v\n", cid, err)
 					}
 					continue
 				}
@@ -98,11 +99,13 @@ func PinCIDsFromSource(sourceApiUrl string, workers int, infuraShell *ipfsShell.
 				if ok {
 					successPinsCount++
 				} else {
+					log.Printf("[ERROR] Failed pinning CID: '%v'\n", cid)
 					failedPinsCount++
 					_, err := failedPinsWriter.Write(cid)
 					if err != nil {
-						log.Printf("[ERROR] Failed pinning CID: '%v'\n", cid)
+						log.Printf("[ERROR] Failed writing pinning error to file for CID: '%v'. %v\n", cid, err)
 					}
+					continue
 				}
 			}
 			wg.Done()
