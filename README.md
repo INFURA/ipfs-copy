@@ -4,8 +4,8 @@
 `ipfs-copy` is a migration tool for both existing Infura IPFS users and new users currently self-hosting their data that want to migrate to the new, more reliable, performant Infura IPFS service with all the latest features.
 
 Migration steps:
-- [How existing Infura users can migrate their content from the past months/years](./MigrationExistingUsers.md)
-- [How new users can import their self-hosted IPFS content to Infura](./MigrationNewUsers.md)
+- [If you already access IPFS via Infura's API, learn how to migrate your content to the new version](./MigrationExistingUsers.md)
+- [If you are a new user to Infura's IPFS service and want to migrate content from another IPFS node](./MigrationNewUsers.md)
 
 ## License
 MIT
