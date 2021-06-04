@@ -23,6 +23,8 @@ cd ipfs-copy
 make install
 ```
 
+Or by downloading a [pre-built binary](https://github.com/INFURA/ipfs-copy/releases/tag/v1.0.0) from the release page.
+
 ## Step 3 - Migrate your content
 The `ipfs-copy` command **will iterate all pins from the source node, copy the blocks and then pin them** to your Infura IPFS project in parallel with multiple workers for optimal performance.
 

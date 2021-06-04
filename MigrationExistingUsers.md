@@ -33,6 +33,8 @@ cd ipfs-copy
 make install
 ```
 
+Or by downloading a [pre-built binary](https://github.com/INFURA/ipfs-copy/releases/tag/v1.0.0) from the release page.
+
 ### Run it
 The `ipfs-copy` command will read your file with all the IPFS hashes (CIDs) and pin them to your Infura IPFS project in parallel with multiple workers for optimal performance.
 
