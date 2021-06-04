@@ -8,6 +8,7 @@ import (
 	"log"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	ipfsPump "github.com/INFURA/ipfs-pump/pump"
 	ipfsCid "github.com/ipfs/go-cid"
@@ -16,48 +17,27 @@ import (
 
 // PinCIDsFromFile will open the file, read a CID from each line separated by LB char and pin them
 // in parallel with multiple workers via the pre-configured shell.
-func PinCIDsFromFile(file io.ReadSeeker, workers int, shell *ipfsShell.Shell, failedPinsWriter ipfsPump.FailedBlocksWriter) (successPinsCount int, failedPinsCount int, err error) {
+func PinCIDsFromFile(ctx context.Context, file io.ReadSeeker, workers int, infuraShell *ipfsShell.Shell, failedPinsWriter ipfsPump.FailedBlocksWriter) (successPinsCount uint64, failedPinsCount uint64, err error) {
 	cids := make(chan ipfsCid.Cid)
-	successPinsCount = 0
-	failedPinsCount = 0
-
-	// 5 workers (by default) will be handling pinning of the entire file
-	var wg sync.WaitGroup
-	for w := 1; w <= workers; w++ {
-		wg.Add(1)
-		go func() {
-			for cid := range cids {
-				ok := pinCid(cid, shell)
-				if ok {
-					successPinsCount++
-				} else {
-					log.Printf("[ERROR] Failed pinning CID: '%v'\n", cid)
-					failedPinsCount++
-					_, err := failedPinsWriter.Write(cid)
-					if err != nil {
-						log.Printf("[ERROR] Failed writing pinning error to file for CID: '%v'. %v\n", cid, err)
-					}
-					continue
-				}
-			}
-			wg.Done()
-		}()
-	}
 
 	_, err = file.Seek(0, io.SeekStart)
 	if err != nil {
 		return 0, 0, fmt.Errorf("failed to seek file to the start. %w", err)
 	}
 
-	readCIDs(file, cids)
-	close(cids)
-	wg.Wait()
+	// Read all the pins from a file
+	go func() {
+		readCIDs(file, cids)
+		close(cids)
+	}()
+
+	successPinsCount, failedPinsCount = pinCIDs(cids, workers, infuraShell, failedPinsWriter)
 
 	return successPinsCount, failedPinsCount, nil
 }
 
 // PinCIDsFromSource iterates over all pins, filters Recursive + Direct, and pins then in parallel with multiple workers via the pre-configured shell.
-func PinCIDsFromSource(sourceApiUrl string, workers int, infuraShell *ipfsShell.Shell, failedPinsWriter ipfsPump.FailedBlocksWriter) (successPinsCount int, skippedIndirectPinsCount int, failedPinsCount int, err error) {
+func PinCIDsFromSource(ctx context.Context, sourceApiUrl string, workers int, infuraShell *ipfsShell.Shell, failedPinsWriter ipfsPump.FailedBlocksWriter) (successPinsCount uint64, skippedIndirectPinsCount uint64, failedPinsCount uint64, err error) {
 	cids := make(chan ipfsCid.Cid)
 	successPinsCount = 0
 	failedPinsCount = 0
@@ -69,7 +49,7 @@ func PinCIDsFromSource(sourceApiUrl string, workers int, infuraShell *ipfsShell.
 		return 0, 0, 0, err
 	}
 
-	// Read all the pins
+	// Read all the pins from the source shell
 	go func() {
 		for pinInfo := range pinStream {
 			if pinInfo.Type == ipfsShell.IndirectPin {
@@ -89,23 +69,26 @@ func PinCIDsFromSource(sourceApiUrl string, workers int, infuraShell *ipfsShell.
 		close(cids)
 	}()
 
-	// 5 workers (by default) will be handling pinning already filtered direct + recursive pins
+	successPinsCount, failedPinsCount = pinCIDs(cids, workers, infuraShell, failedPinsWriter)
+
+	return successPinsCount, skippedIndirectPinsCount, failedPinsCount, nil
+}
+
+func pinCIDs(cids <-chan ipfsCid.Cid, workers int, infuraShell *ipfsShell.Shell, failedPinsWriter ipfsPump.FailedBlocksWriter) (successPinsCount uint64, failedPinsCount uint64) {
+	successPinsCount = 0
+	failedPinsCount = 0
+
+	// 5 workers (by default) will be handling pinning of the entire file
 	var wg sync.WaitGroup
 	for w := 1; w <= workers; w++ {
 		wg.Add(1)
 		go func() {
 			for cid := range cids {
-				ok := pinCid(cid, infuraShell)
+				ok := pinCID(cid, infuraShell, failedPinsWriter)
 				if ok {
-					successPinsCount++
+					atomic.AddUint64(&successPinsCount, 1)
 				} else {
-					log.Printf("[ERROR] Failed pinning CID: '%v'\n", cid)
-					failedPinsCount++
-					_, err := failedPinsWriter.Write(cid)
-					if err != nil {
-						log.Printf("[ERROR] Failed writing pinning error to file for CID: '%v'. %v\n", cid, err)
-					}
-					continue
+					atomic.AddUint64(&failedPinsCount, 1)
 				}
 			}
 			wg.Done()
@@ -113,13 +96,25 @@ func PinCIDsFromSource(sourceApiUrl string, workers int, infuraShell *ipfsShell.
 	}
 	wg.Wait()
 
-	return successPinsCount, skippedIndirectPinsCount, failedPinsCount, nil
+	// Flush all un-persisted (buffered) failed CIDs to the file
+	err := failedPinsWriter.Flush()
+	if err != nil {
+		log.Printf("[ERROR] Unable to flush failed pins to a file. %v\n", err)
+	}
+
+	return successPinsCount, failedPinsCount
 }
 
-func pinCid(c ipfsCid.Cid, infuraShell *ipfsShell.Shell) bool {
+func pinCID(c ipfsCid.Cid, infuraShell *ipfsShell.Shell, failedPinsWriter ipfsPump.FailedBlocksWriter) bool {
 	err := infuraShell.Pin(c.String())
 	if err != nil {
-		log.Printf("[ERROR] Unable to pin '%v'. %v", c, strings.TrimSpace(err.Error()))
+		log.Printf("[ERROR] Failed pinning CID '%v'. %v", c, strings.TrimSpace(err.Error()))
+
+		_, err := failedPinsWriter.Write(c)
+		if err != nil {
+			log.Printf("[ERROR] Unable to write failed CID '%v' pin to file. %v\n", c, err)
+		}
+
 		return false
 	}
 

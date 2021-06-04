@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -36,6 +37,7 @@ type Config struct {
 func main() {
 	AddVersionCmd()
 
+	ctx := context.Background()
 	cfg := mustParseConfigFromEnv()
 	infuraShell := ipfsApi.NewShellWithClient(cfg.ApiUrl, NewClient(cfg.ProjectID, cfg.ProjectSecret))
 
@@ -44,8 +46,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("[ERROR] %v\n", err)
 	}
-
-	progressWriter := ipfsPump.NewProgressWriter()
 
 	var failedCIDsWriter ipfsPump.FailedBlocksWriter
 	if cfg.FileFailed == "" {
@@ -65,13 +65,15 @@ func main() {
 		}()
 	}
 
+	log.Printf("[INFO] Pinning CIDs to %v with %v workers...\n", cfg.ApiUrl, cfg.Workers)
+
 	if cfg.IsFileCopy {
-		PinCIDsFromFile(cfg, infuraShell, failedCIDsWriter)
+		PinCIDsFromFile(ctx, cfg, infuraShell, failedCIDsWriter)
 		os.Exit(0)
 	}
 
 	if cfg.IsSourceAPICopy {
-		PumpBlocksAndCopyPins(cfg, infuraShell, failedCIDsWriter, progressWriter)
+		PumpBlocksAndCopyPins(ctx, cfg, infuraShell, failedCIDsWriter, ipfsPump.NewProgressWriter())
 		os.Exit(0)
 	}
 }
@@ -84,18 +86,19 @@ func AddVersionCmd() {
 	}
 }
 
-func PinCIDsFromFile(cfg Config, infuraShell *ipfsApi.Shell, failedPinsWriter ipfsPump.FailedBlocksWriter) {
+func PinCIDsFromFile(ctx context.Context, cfg Config, infuraShell *ipfsApi.Shell, failedPinsWriter ipfsPump.FailedBlocksWriter) {
 	file, err := os.Open(cfg.File)
 	if err != nil {
 		log.Fatalf("[ERROR] %v\n", err)
 	}
 	defer func() {
 		err := file.Close()
-		log.Fatalf("[ERROR] %v\n", err)
+		if err != nil {
+			log.Fatalf("[ERROR] %v\n", err)
+		}
 	}()
 
-	log.Printf("[INFO] Pinning the CIDs to %v with %v workers...\n", cfg.ApiUrl, cfg.Workers)
-	successPinsCount, failedPinsCount, err := ipfsCopy.PinCIDsFromFile(file, cfg.Workers, infuraShell, failedPinsWriter)
+	successPinsCount, failedPinsCount, err := ipfsCopy.PinCIDsFromFile(ctx, file, cfg.Workers, infuraShell, failedPinsWriter)
 	if err != nil {
 		log.Fatalf("[ERROR] %v\n", err)
 	}
@@ -104,7 +107,7 @@ func PinCIDsFromFile(cfg Config, infuraShell *ipfsApi.Shell, failedPinsWriter ip
 	log.Printf("[INFO] Failed to pin %d CIDs\n", failedPinsCount)
 }
 
-func PumpBlocksAndCopyPins(cfg Config, infuraShell *ipfsApi.Shell, failedCIDsWriter ipfsPump.FailedBlocksWriter, progressWriter ipfsPump.ProgressWriter) {
+func PumpBlocksAndCopyPins(ctx context.Context, cfg Config, infuraShell *ipfsApi.Shell, failedCIDsWriter ipfsPump.FailedBlocksWriter, progressWriter ipfsPump.ProgressWriter) {
 	pinEnum := ipfsPump.NewAPIPinEnumerator(cfg.SourceAPI, true)
 	blocksColl := ipfsPump.NewAPICollector(cfg.SourceAPI)
 	drain := ipfsPump.NewCountedDrain(ipfsPump.NewAPIDrainWithShell(infuraShell))
@@ -114,7 +117,7 @@ func PumpBlocksAndCopyPins(cfg Config, infuraShell *ipfsApi.Shell, failedCIDsWri
 	log.Printf("[INFO] Copied %d blocks\n", drain.SuccessfulBlocksCount())
 
 	// Once **all the blocks are copied**, pin the RECURSIVE + DIRECT pins (not before)
-	successPinsCount, skippedIndirectPinsCount, failedPinsCount, err := ipfsCopy.PinCIDsFromSource(cfg.SourceAPI, cfg.Workers, infuraShell, failedCIDsWriter)
+	successPinsCount, skippedIndirectPinsCount, failedPinsCount, err := ipfsCopy.PinCIDsFromSource(ctx, cfg.SourceAPI, cfg.Workers, infuraShell, failedCIDsWriter)
 	if err != nil {
 		log.Fatalf("[ERROR] %v\n", err)
 	}
