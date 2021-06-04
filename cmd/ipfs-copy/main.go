@@ -1,83 +1,163 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
 
-	"github.com/gravitational/configure"
-
 	ipfsCopy "github.com/INFURA/ipfs-copy"
-
+	ipfsPump "github.com/INFURA/ipfs-pump/pump"
+	"github.com/gravitational/configure"
 	ipfsApi "github.com/ipfs/go-ipfs-api"
 )
 
 const DefaultApiUrl = "https://ipfs.infura.io:5001"
 const DefaultWorkersCount = 5
+const Version = "1.0.0"
 
 type Config struct {
-	ApiUrl        string `env:"IC_API_URL"        cli:"api_url"`
-	File          string `env:"IC_FILE"           cli:"file"`
+	ApiUrl        string `env:"IC_API_URL"        cli:"api-url"`
+	File          string `env:"IC_CIDS"           cli:"cids"`
+	FileFailed    string `env:"IC_CIDS_FAILED"    cli:"cids-failed"`
+	SourceAPI     string `env:"IC_SOURCE_API_URL" cli:"source-api-url"`
 	Workers       int    `env:"IC_WORKERS"        cli:"workers"`
-	ProjectID     string `env:"IC_PROJECT_ID"     cli:"project_id"`
-	ProjectSecret string `env:"IC_PROJECT_SECRET" cli:"project_secret"`
+	ProjectID     string `env:"IC_PROJECT_ID"     cli:"project-id"`
+	ProjectSecret string `env:"IC_PROJECT_SECRET" cli:"project-secret"`
+
+	// Helper settings
+
+	// IsFileCopy is for existing users migration, pinning of files already existing on Infura IPFS nodes
+	IsFileCopy bool
+
+	// IsSourceAPICopy is for new users migrating their content from other IPFS nodes to Infura
+	IsSourceAPICopy bool
 }
 
 func main() {
-	cfg := mustParseConfigFromEnv()
+	AddVersionCmd()
 
+	ctx := context.Background()
+	cfg := mustPrepareConfig()
+	infuraShell := ipfsApi.NewShellWithClient(cfg.ApiUrl, NewClient(cfg.ProjectID, cfg.ProjectSecret))
+
+	// Validates the credentials before spawning all the workers
+	_, _, err := infuraShell.Version()
+	if err != nil {
+		log.Fatalf("[ERROR] %v\n", err)
+	}
+
+	var failedCIDsWriter ipfsPump.FailedBlocksWriter
+	if cfg.FileFailed == "" {
+		failedCIDsWriter = ipfsPump.NewNullableFileEnumeratorWriter()
+	} else {
+		enumWriter, closeWriter, err := ipfsPump.NewFileEnumeratorWriter(cfg.FileFailed)
+		if err != nil {
+			log.Fatalf("[ERROR] %v\n", err)
+		}
+		failedCIDsWriter = enumWriter
+
+		defer func() {
+			err = closeWriter()
+			if err != nil {
+				log.Fatalf("[ERROR] %v\n", err)
+			}
+		}()
+	}
+
+	log.Printf("[INFO] Pinning CIDs to %v with %v workers...\n", cfg.ApiUrl, cfg.Workers)
+
+	if cfg.IsFileCopy {
+		PinCIDsFromFile(ctx, cfg, infuraShell, failedCIDsWriter)
+		os.Exit(0)
+	}
+
+	if cfg.IsSourceAPICopy {
+		PumpBlocksAndCopyPins(ctx, cfg, infuraShell, failedCIDsWriter, ipfsPump.NewProgressWriter())
+		os.Exit(0)
+	}
+}
+
+func AddVersionCmd() {
+	// Support for `ipfs-copy version` command:
+	if len(os.Args) > 1 && os.Args[1] == "version" {
+		fmt.Printf("ipfs-copy version: %v\n", Version)
+		os.Exit(0)
+	}
+}
+
+func PinCIDsFromFile(ctx context.Context, cfg Config, infuraShell *ipfsApi.Shell, failedPinsWriter ipfsPump.FailedBlocksWriter) {
 	file, err := os.Open(cfg.File)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		log.Fatalf("[ERROR] %v\n", err)
 	}
 	defer func() {
 		err := file.Close()
-		fmt.Println(err)
-		os.Exit(1)
+		if err != nil {
+			log.Fatalf("[ERROR] %v\n", err)
+		}
 	}()
 
-	shell := ipfsApi.NewShellWithClient(cfg.ApiUrl, NewClient(cfg.ProjectID, cfg.ProjectSecret))
-
-	log.Printf("[INFO] Pinning the CIDs to %v with %v workers...", cfg.ApiUrl, cfg.Workers)
-	successPinsCount, failedPinsCount, err := ipfsCopy.PinCIDsFromFile(file, cfg.Workers, shell)
+	successPinsCount, failedPinsCount, err := ipfsCopy.PinCIDsFromFile(ctx, file, cfg.Workers, infuraShell, failedPinsWriter)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		log.Fatalf("[ERROR] %v\n", err)
 	}
 
-	log.Printf("[INFO] Successfully pinned %d CIDs", successPinsCount)
-	log.Printf("[INFO] Failed to pin %d CIDs", failedPinsCount)
+	log.Printf("[INFO] Successfully pinned %d CIDs\n", successPinsCount)
+	log.Printf("[INFO] Failed to pin %d CIDs\n", failedPinsCount)
 }
 
-func mustParseConfigFromEnv() Config {
+func PumpBlocksAndCopyPins(ctx context.Context, cfg Config, infuraShell *ipfsApi.Shell, failedCIDsWriter ipfsPump.FailedBlocksWriter, progressWriter ipfsPump.ProgressWriter) {
+	pinEnum := ipfsPump.NewAPIPinEnumerator(cfg.SourceAPI, true)
+	blocksColl := ipfsPump.NewAPICollector(cfg.SourceAPI)
+	drain := ipfsPump.NewCountedDrain(ipfsPump.NewAPIDrainWithShell(infuraShell))
+
+	// Copy all the blocks
+	ipfsPump.PumpIt(pinEnum, blocksColl, drain, failedCIDsWriter, progressWriter, uint(cfg.Workers))
+	log.Printf("[INFO] Copied %d blocks\n", drain.SuccessfulBlocksCount())
+
+	// Once **all the blocks are copied**, pin the RECURSIVE + DIRECT pins (not before)
+	successPinsCount, _, failedPinsCount, err := ipfsCopy.PinCIDsFromSource(ctx, cfg.SourceAPI, cfg.Workers, infuraShell, failedCIDsWriter)
+	if err != nil {
+		log.Fatalf("[ERROR] %v\n", err)
+	}
+
+	log.Printf("[INFO] Successfully pinned %d CIDs\n", successPinsCount)
+	//log.Printf("[INFO] Skipped indirect %d CIDs\n", skippedIndirectPinsCount)
+	log.Printf("[INFO] Failed to pin %d CIDs\n", failedPinsCount)
+}
+
+func mustPrepareConfig() Config {
 	var cfg Config
 
 	err := configure.ParseEnv(&cfg)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		log.Fatalf("[ERROR] %v\n", err)
 	}
 
 	err = configure.ParseCommandLine(&cfg, os.Args[1:])
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		log.Fatalf("[ERROR] %v\n", err)
 	}
 
-	if len(cfg.File) == 0 {
-		fmt.Println("IPFS Copy requires IC_FILE env var or --file flag to be defined.")
-		os.Exit(1)
+	if len(cfg.File) == 0 && len(cfg.SourceAPI) == 0 {
+		log.Fatal("[ERROR] IPFS Copy requires (IC_CIDS, --cids) OR (IC_SOURCE_API_URL, --source-api-url) to be defined.\n")
+	}
+
+	if len(cfg.File) > 0 {
+		cfg.IsFileCopy = true
+		cfg.IsSourceAPICopy = false
+	} else {
+		cfg.IsFileCopy = false
+		cfg.IsSourceAPICopy = true
 	}
 
 	if len(cfg.ProjectID) == 0 {
-		fmt.Println("IPFS Copy requires IC_PROJECT_ID env var or --project_id flag to be defined.")
-		os.Exit(1)
+		log.Fatal("[ERROR] IPFS Copy requires IC_PROJECT_ID env var or --project-id flag to be defined.\n")
 	}
 
 	if len(cfg.ProjectSecret) == 0 {
-		fmt.Println("IPFS Copy requires IC_PROJECT_SECRET env var or --project_secret flag to be defined.")
-		os.Exit(1)
+		log.Fatal("[ERROR] IPFS Copy requires IC_PROJECT_SECRET env var or --project-secret flag to be defined.\n")
 	}
 
 	if len(cfg.ApiUrl) == 0 {
