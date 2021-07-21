@@ -14,7 +14,7 @@ import (
 
 const DefaultApiUrl = "https://ipfs.infura.io:5001"
 const DefaultWorkersCount = 5
-const Version = "1.0.0"
+const Version = "1.1.0"
 
 type Config struct {
 	ApiUrl        string `env:"IC_API_URL"        cli:"api-url"`
@@ -42,10 +42,11 @@ func main() {
 	infuraShell := ipfsApi.NewShellWithClient(cfg.ApiUrl, NewClient(cfg.ProjectID, cfg.ProjectSecret))
 
 	// Validates the credentials before spawning all the workers
-	_, _, err := infuraShell.Version()
+	infuraShellVersion, _, err := infuraShell.Version()
 	if err != nil {
 		log.Fatalf("[ERROR] %v\n", err)
 	}
+	log.Printf("[INFO] Infura IPFS version is: %v", infuraShellVersion)
 
 	var failedCIDsWriter ipfsPump.FailedBlocksWriter
 	if cfg.FileFailed == "" {
@@ -108,7 +109,19 @@ func PinCIDsFromFile(ctx context.Context, cfg Config, infuraShell *ipfsApi.Shell
 }
 
 func PumpBlocksAndCopyPins(ctx context.Context, cfg Config, infuraShell *ipfsApi.Shell, failedCIDsWriter ipfsPump.FailedBlocksWriter, progressWriter ipfsPump.ProgressWriter) {
-	pinEnum := ipfsPump.NewAPIPinEnumerator(cfg.SourceAPI, true)
+	sourceShell := ipfsApi.NewShell(cfg.SourceAPI)
+
+	// Validate the connection and query the version so we know what features the source has (esp. pin ls --stream)
+	sourceShellRawVersion, _, err := sourceShell.Version()
+	if err != nil {
+		log.Fatalf("[ERROR] %v\n", err)
+	}
+
+	log.Printf("[INFO] Source IPFS version is: %v", sourceShellRawVersion)
+	isEnumStreamingPossible := hasShellStreamPinListSupport(sourceShellRawVersion)
+	log.Printf("[DEBUG] Source IPFS pin/ls --stream support?: %v", isEnumStreamingPossible)
+
+	pinEnum := ipfsPump.NewAPIPinEnumerator(cfg.SourceAPI, isEnumStreamingPossible)
 	blocksColl := ipfsPump.NewAPICollector(cfg.SourceAPI)
 	drain := ipfsPump.NewCountedDrain(ipfsPump.NewAPIDrainWithShell(infuraShell))
 
@@ -117,13 +130,12 @@ func PumpBlocksAndCopyPins(ctx context.Context, cfg Config, infuraShell *ipfsApi
 	log.Printf("[INFO] Copied %d blocks\n", drain.SuccessfulBlocksCount())
 
 	// Once **all the blocks are copied**, pin the RECURSIVE + DIRECT pins (not before)
-	successPinsCount, _, failedPinsCount, err := ipfsCopy.PinCIDsFromSource(ctx, cfg.SourceAPI, cfg.Workers, infuraShell, failedCIDsWriter)
+	successPinsCount, failedPinsCount, err := ipfsCopy.PinCIDsFromSource(ctx, cfg.Workers, isEnumStreamingPossible, sourceShell, infuraShell, failedCIDsWriter)
 	if err != nil {
 		log.Fatalf("[ERROR] %v\n", err)
 	}
 
 	log.Printf("[INFO] Successfully pinned %d CIDs\n", successPinsCount)
-	//log.Printf("[INFO] Skipped indirect %d CIDs\n", skippedIndirectPinsCount)
 	log.Printf("[INFO] Failed to pin %d CIDs\n", failedPinsCount)
 }
 
