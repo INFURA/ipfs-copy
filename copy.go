@@ -44,7 +44,7 @@ func PinCIDsFromSource(ctx context.Context, workers int, hasSourceShellListStrea
 
 	if hasSourceShellListStreaming {
 		log.Printf("[INFO] Streaming pins from the source IPFS node...")
-		err = streamPinsFromSource(pins, sourceShell)
+		err = streamPinsFromSource(ctx, pins, sourceShell)
 		if err != nil {
 			return 0, 0, err
 		}
@@ -61,8 +61,8 @@ func PinCIDsFromSource(ctx context.Context, workers int, hasSourceShellListStrea
 	return successPinsCount, failedPinsCount, nil
 }
 
-func streamPinsFromSource(cids chan ipfsCid.Cid, sourceShell *ipfsShell.Shell) error {
-	pinStream, err := sourceShell.PinsStream(context.Background())
+func streamPinsFromSource(ctx context.Context, cids chan ipfsCid.Cid, sourceShell *ipfsShell.Shell) error {
+	pinStream, err := sourceShell.PinsStream(ctx)
 	if err != nil {
 		return err
 	}
