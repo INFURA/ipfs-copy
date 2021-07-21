@@ -37,30 +37,45 @@ func PinCIDsFromFile(ctx context.Context, file io.ReadSeeker, workers int, infur
 }
 
 // PinCIDsFromSource iterates over all pins, filters Recursive + Direct, and pins then in parallel with multiple workers via the pre-configured shell.
-func PinCIDsFromSource(ctx context.Context, sourceApiUrl string, workers int, infuraShell *ipfsShell.Shell, failedPinsWriter ipfsPump.FailedBlocksWriter) (successPinsCount uint64, skippedIndirectPinsCount uint64, failedPinsCount uint64, err error) {
-	cids := make(chan ipfsCid.Cid)
+func PinCIDsFromSource(ctx context.Context, workers int, hasSourceShellListStreaming bool, sourceShell *ipfsShell.Shell, infuraShell *ipfsShell.Shell, failedPinsWriter ipfsPump.FailedBlocksWriter) (successPinsCount uint64, failedPinsCount uint64, err error) {
+	pins := make(chan ipfsCid.Cid)
 	successPinsCount = 0
 	failedPinsCount = 0
-	skippedIndirectPinsCount = 0
 
-	sourceShell := ipfsShell.NewShell(sourceApiUrl)
-	pinStream, err := sourceShell.PinsStream(context.Background())
-	if err != nil {
-		return 0, 0, 0, err
+	if hasSourceShellListStreaming {
+		log.Printf("[INFO] Streaming pins from the source IPFS node...")
+		err = streamPinsFromSource(ctx, pins, sourceShell)
+		if err != nil {
+			return 0, 0, err
+		}
+	} else {
+		log.Printf("[INFO] Fetching pins from the source IPFS node to memory...")
+		err = fetchPinsFromSource(pins, sourceShell)
+		if err != nil {
+			return 0, 0, err
+		}
 	}
 
-	// Read all the pins from the source shell
+	successPinsCount, failedPinsCount = pinCIDs(pins, workers, infuraShell, failedPinsWriter)
+
+	return successPinsCount, failedPinsCount, nil
+}
+
+func streamPinsFromSource(ctx context.Context, cids chan ipfsCid.Cid, sourceShell *ipfsShell.Shell) error {
+	pinStream, err := sourceShell.PinsStream(ctx)
+	if err != nil {
+		return err
+	}
+
 	go func() {
 		for pinInfo := range pinStream {
 			if pinInfo.Type == ipfsShell.IndirectPin {
-				//log.Printf("[DEBUG] Skipping indirect pin from stream: '%v'\n", pinInfo.Cid)
-				skippedIndirectPinsCount++
 				continue
 			}
 
 			c, err := ipfsCid.Parse(pinInfo.Cid)
 			if err != nil {
-				log.Printf("[ERROR] Failed parsing pin from stream. %v\n", err)
+				log.Printf("[ERROR] Failed parsing pin '%v' from stream. %v\n", pinInfo.Cid, err)
 				continue
 			}
 
@@ -69,9 +84,43 @@ func PinCIDsFromSource(ctx context.Context, sourceApiUrl string, workers int, in
 		close(cids)
 	}()
 
-	successPinsCount, failedPinsCount = pinCIDs(cids, workers, infuraShell, failedPinsWriter)
+	return nil
+}
 
-	return successPinsCount, skippedIndirectPinsCount, failedPinsCount, nil
+// fetchPinsFromSource is a duplicate of streamPinsFromSource but without the streaming logic.
+//
+// The difference is:
+// - IPFS version < 0.5.0 has no stream support
+// - The Pins() loads all the pins from source into memory at once
+// - The code can't be reused much or wrapped or decorated because the Shell returns quite different responses:
+//     - PinsStream() returns <-chan **PinStreamInfo**
+//     - Pins() returns map[string]**PinInfo**
+//
+// Hence it's easier to duplicate than create awkward abstractions in this case.
+func fetchPinsFromSource(cids chan ipfsCid.Cid, sourceShell *ipfsShell.Shell) error {
+	pins, err := sourceShell.Pins()
+	if err != nil {
+		return err
+	}
+
+	go func() {
+		for cid, info := range pins {
+			if info.Type == ipfsShell.IndirectPin {
+				continue
+			}
+
+			c, err := ipfsCid.Parse(cid)
+			if err != nil {
+				log.Printf("[ERROR] Failed parsing pin '%v' from stream. %v\n", cid, err)
+				continue
+			}
+
+			cids <- c
+		}
+		close(cids)
+	}()
+
+	return nil
 }
 
 func pinCIDs(cids <-chan ipfsCid.Cid, workers int, infuraShell *ipfsShell.Shell, failedPinsWriter ipfsPump.FailedBlocksWriter) (successPinsCount uint64, failedPinsCount uint64) {
