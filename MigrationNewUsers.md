@@ -33,6 +33,7 @@ The `ipfs-copy` command **will iterate all pins from the source node, copy the b
 ipfs-copy --source-api-url=http://localhost:5001 --project-id=<YOUR_PROJECT_ID> --project-secret=<YOUR_PROJECT_SECRET>
 ```
 - optional flag `--workers` defines how many pins to copy in parallel (**default:** 5)
+- optional flag `--cids-failed=/tmp/failed_pins.txt` defines an absolute path where failed pins will be logged
 
 ### Run `ipfs-copy` using ENV variables
 The `.env` contains:
@@ -40,6 +41,7 @@ The `.env` contains:
 - IC_PROJECT_ID
 - IC_PROJECT_SECRET
 - IC_WORKERS
+- IC_CIDS_FAILED
 
 ```bash
 cp new-self-hosted-users-sample.env .env
@@ -48,3 +50,7 @@ source .env && ipfs-copy
 ```
 
 Done! You have migrated your content to Infura IPFS service!
+
+---
+## Bonus step - limit traffic from a specific IP
+Configure your IP inside the **Allowlist -> Limit IP Access** in your project's security settings to restrict access only from a desired list of IPs.

@@ -42,7 +42,8 @@ The `ipfs-copy` command will read your file with all the IPFS hashes (CIDs) and 
 ```bash
 ipfs-copy --cids=/home/xxx/Documents/ipfs-cids.txt --project-id=<YOUR_PROJECT_ID> --project-secret=<YOUR_PROJECT_SECRET>
 ```
-- optional flag `--workers` defines how many CIDs to pin in parallel (**default:** 5)
+- optional flag `--workers=5` defines how many CIDs to pin in parallel (**default:** 5)
+- optional flag `--cids-failed=/tmp/failed_pins.txt` defines an absolute path where failed pins will be logged
 
 #### Using ENV values
 The `.env` file contains the following env variables:
@@ -50,6 +51,7 @@ The `.env` file contains the following env variables:
 - IC_PROJECT_ID
 - IC_PROJECT_SECRET
 - IC_WORKERS
+- IC_CIDS_FAILED
 
 ```bash
 cp existing-users-sample.env .env
@@ -58,3 +60,7 @@ source .env && ipfs-copy
 ```
 
 Done! You have completed the migration to the new IPFS service!
+
+---
+## Bonus step - limit traffic from a specific IP
+Configure your IP inside the **Allowlist -> Limit IP Access** in your project's security settings to restrict access only from a desired list of IPs.
