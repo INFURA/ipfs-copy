@@ -3,27 +3,29 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
-	"os"
-
 	ipfsCopy "github.com/INFURA/ipfs-copy"
+	"github.com/INFURA/ipfs-copy/pump"
 	ipfsPump "github.com/INFURA/ipfs-pump/pump"
 	"github.com/gravitational/configure"
 	ipfsApi "github.com/ipfs/go-ipfs-api"
+	"log"
+	"os"
 )
 
 const DefaultApiUrl = "https://ipfs.infura.io:5001"
-const DefaultWorkersCount = 5
-const Version = "1.1.0"
+const DefaultWorkersCount = 1
+const DefaultMaxReqsPerSec = 10
+const Version = "1.2.0"
 
 type Config struct {
-	ApiUrl        string `env:"IC_API_URL"        cli:"api-url"`
-	File          string `env:"IC_CIDS"           cli:"cids"`
-	FileFailed    string `env:"IC_CIDS_FAILED"    cli:"cids-failed"`
-	SourceAPI     string `env:"IC_SOURCE_API_URL" cli:"source-api-url"`
-	Workers       int    `env:"IC_WORKERS"        cli:"workers"`
-	ProjectID     string `env:"IC_PROJECT_ID"     cli:"project-id"`
-	ProjectSecret string `env:"IC_PROJECT_SECRET" cli:"project-secret"`
+	ApiUrl        string `env:"IC_API_URL"         cli:"api-url"`
+	File          string `env:"IC_CIDS"            cli:"cids"`
+	FileFailed    string `env:"IC_CIDS_FAILED"     cli:"cids-failed"`
+	SourceAPI     string `env:"IC_SOURCE_API_URL"  cli:"source-api-url"`
+	Workers       int    `env:"IC_WORKERS"         cli:"workers"`
+	MaxReqsPerSec int    `env:"IC_MAX_REQ_PER_SEC" cli:"max-req-per-sec"`
+	ProjectID     string `env:"IC_PROJECT_ID"      cli:"project-id"`
+	ProjectSecret string `env:"IC_PROJECT_SECRET"  cli:"project-secret"`
 
 	// Helper settings
 
@@ -66,7 +68,7 @@ func main() {
 		}()
 	}
 
-	log.Printf("[INFO] Pinning CIDs to %v with %v workers...\n", cfg.ApiUrl, cfg.Workers)
+	log.Printf("[INFO] Pinning CIDs to %v with %v workers and maximum %v req/s/worker...\n", cfg.ApiUrl, cfg.Workers, cfg.MaxReqsPerSec)
 
 	if cfg.IsFileCopy {
 		PinCIDsFromFile(ctx, cfg, infuraShell, failedCIDsWriter)
@@ -99,7 +101,7 @@ func PinCIDsFromFile(ctx context.Context, cfg Config, infuraShell *ipfsApi.Shell
 		}
 	}()
 
-	successPinsCount, failedPinsCount, err := ipfsCopy.PinCIDsFromFile(ctx, file, cfg.Workers, infuraShell, failedPinsWriter)
+	successPinsCount, failedPinsCount, err := ipfsCopy.PinCIDsFromFile(ctx, file, cfg.Workers, cfg.MaxReqsPerSec, infuraShell, failedPinsWriter)
 	if err != nil {
 		log.Fatalf("[ERROR] %v\n", err)
 	}
@@ -123,14 +125,14 @@ func PumpBlocksAndCopyPins(ctx context.Context, cfg Config, infuraShell *ipfsApi
 
 	pinEnum := ipfsPump.NewAPIPinEnumerator(cfg.SourceAPI, isEnumStreamingPossible)
 	blocksColl := ipfsPump.NewAPICollector(cfg.SourceAPI)
-	drain := ipfsPump.NewCountedDrain(ipfsPump.NewAPIDrainWithShell(infuraShell))
+	drain := pump.NewRateLimitedDrain(ipfsPump.NewAPIDrainWithShell(infuraShell), ipfsCopy.CalculateRateLimitDuration(cfg.MaxReqsPerSec))
 
 	// Copy all the blocks
 	ipfsPump.PumpIt(pinEnum, blocksColl, drain, failedCIDsWriter, progressWriter, uint(cfg.Workers))
 	log.Printf("[INFO] Copied %d blocks\n", drain.SuccessfulBlocksCount())
 
 	// Once **all the blocks are copied**, pin the RECURSIVE + DIRECT pins (not before)
-	successPinsCount, failedPinsCount, err := ipfsCopy.PinCIDsFromSource(ctx, cfg.Workers, isEnumStreamingPossible, sourceShell, infuraShell, failedCIDsWriter)
+	successPinsCount, failedPinsCount, err := ipfsCopy.PinCIDsFromSource(ctx, cfg.Workers, cfg.MaxReqsPerSec, isEnumStreamingPossible, sourceShell, infuraShell, failedCIDsWriter)
 	if err != nil {
 		log.Fatalf("[ERROR] %v\n", err)
 	}
@@ -178,6 +180,10 @@ func mustPrepareConfig() Config {
 
 	if cfg.Workers == 0 {
 		cfg.Workers = DefaultWorkersCount
+	}
+
+	if cfg.MaxReqsPerSec == 0 {
+		cfg.MaxReqsPerSec = DefaultMaxReqsPerSec
 	}
 
 	return cfg

@@ -8,7 +8,7 @@ require (
 	github.com/alecthomas/units v0.0.0-20210208195552-ff826a37aa15 // indirect
 	github.com/coreos/go-semver v0.3.0
 	github.com/gravitational/configure v0.0.0-20180808141939-c3428bd84c23
-	github.com/gravitational/log v0.0.0-20200127200505-fdffa14162b0 // indirect
+	github.com/gravitational/log v0.0.0-20200127200505-fdffa14162b0
 	github.com/gravitational/trace v1.1.14 // indirect
 	github.com/ipfs/go-cid v0.0.7
 	github.com/ipfs/go-ipfs-api v0.2.0
