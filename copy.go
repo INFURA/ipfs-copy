@@ -18,7 +18,7 @@ import (
 
 // PinCIDsFromFile will open the file, read a CID from each line separated by LB char and pin them
 // in parallel with multiple workers via the pre-configured shell.
-func PinCIDsFromFile(ctx context.Context, file io.ReadSeeker, workers int, infuraShell *ipfsShell.Shell, failedPinsWriter ipfsPump.FailedBlocksWriter) (successPinsCount uint64, failedPinsCount uint64, err error) {
+func PinCIDsFromFile(ctx context.Context, file io.ReadSeeker, workers int, maxReqsPerSec int, infuraShell *ipfsShell.Shell, failedPinsWriter ipfsPump.FailedBlocksWriter) (successPinsCount uint64, failedPinsCount uint64, err error) {
 	cids := make(chan ipfsCid.Cid)
 
 	_, err = file.Seek(0, io.SeekStart)
@@ -32,13 +32,13 @@ func PinCIDsFromFile(ctx context.Context, file io.ReadSeeker, workers int, infur
 		close(cids)
 	}()
 
-	successPinsCount, failedPinsCount = pinCIDs(cids, workers, infuraShell, failedPinsWriter)
+	successPinsCount, failedPinsCount = pinCIDs(cids, workers, maxReqsPerSec, infuraShell, failedPinsWriter)
 
 	return successPinsCount, failedPinsCount, nil
 }
 
 // PinCIDsFromSource iterates over all pins, filters Recursive + Direct, and pins then in parallel with multiple workers via the pre-configured shell.
-func PinCIDsFromSource(ctx context.Context, workers int, hasSourceShellListStreaming bool, sourceShell *ipfsShell.Shell, infuraShell *ipfsShell.Shell, failedPinsWriter ipfsPump.FailedBlocksWriter) (successPinsCount uint64, failedPinsCount uint64, err error) {
+func PinCIDsFromSource(ctx context.Context, workers int, maxReqsPerSec int, hasSourceShellListStreaming bool, sourceShell *ipfsShell.Shell, infuraShell *ipfsShell.Shell, failedPinsWriter ipfsPump.FailedBlocksWriter) (successPinsCount uint64, failedPinsCount uint64, err error) {
 	pins := make(chan ipfsCid.Cid)
 	successPinsCount = 0
 	failedPinsCount = 0
@@ -57,7 +57,7 @@ func PinCIDsFromSource(ctx context.Context, workers int, hasSourceShellListStrea
 		}
 	}
 
-	successPinsCount, failedPinsCount = pinCIDs(pins, workers, infuraShell, failedPinsWriter)
+	successPinsCount, failedPinsCount = pinCIDs(pins, workers, maxReqsPerSec, infuraShell, failedPinsWriter)
 
 	return successPinsCount, failedPinsCount, nil
 }
@@ -124,7 +124,7 @@ func fetchPinsFromSource(cids chan ipfsCid.Cid, sourceShell *ipfsShell.Shell) er
 	return nil
 }
 
-func pinCIDs(cids <-chan ipfsCid.Cid, workers int, infuraShell *ipfsShell.Shell, failedPinsWriter ipfsPump.FailedBlocksWriter) (successPinsCount uint64, failedPinsCount uint64) {
+func pinCIDs(cids <-chan ipfsCid.Cid, workers int, maxReqsPerSec int, infuraShell *ipfsShell.Shell, failedPinsWriter ipfsPump.FailedBlocksWriter) (successPinsCount uint64, failedPinsCount uint64) {
 	successPinsCount = 0
 	failedPinsCount = 0
 
@@ -141,7 +141,7 @@ func pinCIDs(cids <-chan ipfsCid.Cid, workers int, infuraShell *ipfsShell.Shell,
 					atomic.AddUint64(&failedPinsCount, 1)
 				}
 				// Avoid getting rate limited
-				time.Sleep(100 * time.Millisecond)
+				time.Sleep(CalculateRateLimitDuration(maxReqsPerSec))
 			}
 			wg.Done()
 		}()

@@ -7,15 +7,16 @@ import (
 )
 
 type RateLimitedDrain struct {
-	drain ipfsPump.CountedDrain
+	drain           ipfsPump.CountedDrain
+	sleepAfterDrain time.Duration
 }
 
 var _ ipfsPump.CountedDrain = (*ipfsPump.CounterDrain)(nil)
 
-func NewDrain(drain ipfsPump.Drain) ipfsPump.CountedDrain {
+func NewRateLimitedDrain(drain ipfsPump.Drain, sleepAfterDrain time.Duration) ipfsPump.CountedDrain {
 	countedDrain := ipfsPump.NewCountedDrain(drain)
 
-	return &RateLimitedDrain{drain: countedDrain}
+	return &RateLimitedDrain{drain: countedDrain, sleepAfterDrain: sleepAfterDrain}
 }
 
 func (d *RateLimitedDrain) Drain(block ipfsPump.Block) error {
@@ -25,7 +26,7 @@ func (d *RateLimitedDrain) Drain(block ipfsPump.Block) error {
 	}
 
 	// Avoid getting rate limited
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(d.sleepAfterDrain)
 
 	return nil
 }

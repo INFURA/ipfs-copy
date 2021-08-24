@@ -5,6 +5,22 @@ on:
     types: [created]
 
 jobs:
+  test:
+    name: Run tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        goos: [linux, windows, darwin]
+        goarch: ["386", amd64]
+        exclude:
+          - goarch: "386"
+            goos: darwin
+    steps:
+      - uses: actions/checkout@v2
+      - uses: wangyoucao577/go-release-action@v1.15
+      - name: Test
+        run: go test ./... -v -p=1 -timeout=0 ./...
+
   releases-matrix:
     name: Release Go Binary
     runs-on: ubuntu-latest
