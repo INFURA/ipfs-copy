@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/INFURA/ipfs-copy/pump"
 	"log"
 	"os"
 
@@ -13,8 +14,8 @@ import (
 )
 
 const DefaultApiUrl = "https://ipfs.infura.io:5001"
-const DefaultWorkersCount = 5
-const Version = "1.1.0"
+const DefaultWorkersCount = 1
+const Version = "1.2.0"
 
 type Config struct {
 	ApiUrl        string `env:"IC_API_URL"        cli:"api-url"`
@@ -123,7 +124,7 @@ func PumpBlocksAndCopyPins(ctx context.Context, cfg Config, infuraShell *ipfsApi
 
 	pinEnum := ipfsPump.NewAPIPinEnumerator(cfg.SourceAPI, isEnumStreamingPossible)
 	blocksColl := ipfsPump.NewAPICollector(cfg.SourceAPI)
-	drain := ipfsPump.NewCountedDrain(ipfsPump.NewAPIDrainWithShell(infuraShell))
+	drain := pump.NewDrain(ipfsPump.NewAPIDrainWithShell(infuraShell))
 
 	// Copy all the blocks
 	ipfsPump.PumpIt(pinEnum, blocksColl, drain, failedCIDsWriter, progressWriter, uint(cfg.Workers))

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	ipfsPump "github.com/INFURA/ipfs-pump/pump"
 	ipfsCid "github.com/ipfs/go-cid"
@@ -139,6 +140,8 @@ func pinCIDs(cids <-chan ipfsCid.Cid, workers int, infuraShell *ipfsShell.Shell,
 				} else {
 					atomic.AddUint64(&failedPinsCount, 1)
 				}
+				// Avoid getting rate limited
+				time.Sleep(100 * time.Millisecond)
 			}
 			wg.Done()
 		}()

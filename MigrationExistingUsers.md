@@ -42,7 +42,7 @@ The `ipfs-copy` command will read your file with all the IPFS hashes (CIDs) and 
 ```bash
 ipfs-copy --cids=/home/xxx/Documents/ipfs-cids.txt --project-id=<YOUR_PROJECT_ID> --project-secret=<YOUR_PROJECT_SECRET>
 ```
-- optional flag `--workers=5` defines how many CIDs to pin in parallel (**default:** 5)
+- optional flag `--workers=1` defines how many CIDs to pin in parallel (**default:** 1)
 - optional flag `--cids-failed=/tmp/failed_pins.txt` defines an absolute path where failed pins will be logged
 
 #### Using ENV values
