@@ -32,8 +32,8 @@ The `ipfs-copy` command **will iterate all pins from the source node, copy the b
 ```bash
 ipfs-copy --source-api-url=http://localhost:5001 --project-id=<YOUR_PROJECT_ID> --project-secret=<YOUR_PROJECT_SECRET>
 ```
-- optional flag `--workers=1` defines how many CIDs to pin in parallel (**default:** 1)
-- optional flag `--max-req-per-sec=10` defines the maximum amount of CIDs a worker can pin per second to avoid getting rate limited (**default:** 10)
+- optional flag `--workers=20` defines how many CIDs to pin in parallel (**default:** 20)
+- optional flag `--max-req-per-sec=50` defines the maximum amount of CIDs a worker can pin per second to avoid getting rate limited (**default:** 50)
 - optional flag `--cids-failed=/tmp/failed_pins.txt` defines an absolute path where failed pins will be logged
 
 ### Run `ipfs-copy` using ENV variables
