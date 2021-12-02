@@ -1,22 +1,19 @@
 package pump
 
 import (
-	"time"
-
 	ipfsPump "github.com/INFURA/ipfs-pump/pump"
 )
 
 type RateLimitedDrain struct {
-	drain           ipfsPump.CountedDrain
-	sleepAfterDrain time.Duration
+	drain ipfsPump.CountedDrain
 }
 
 var _ ipfsPump.CountedDrain = (*ipfsPump.CounterDrain)(nil)
 
-func NewRateLimitedDrain(drain ipfsPump.Drain, sleepAfterDrain time.Duration) ipfsPump.CountedDrain {
+func NewRateLimitedDrain(drain ipfsPump.Drain) ipfsPump.CountedDrain {
 	countedDrain := ipfsPump.NewCountedDrain(drain)
 
-	return &RateLimitedDrain{drain: countedDrain, sleepAfterDrain: sleepAfterDrain}
+	return &RateLimitedDrain{drain: countedDrain}
 }
 
 func (d *RateLimitedDrain) Drain(block ipfsPump.Block) error {
@@ -24,9 +21,6 @@ func (d *RateLimitedDrain) Drain(block ipfsPump.Block) error {
 	if err != nil {
 		return err
 	}
-
-	// Avoid getting rate limited
-	time.Sleep(d.sleepAfterDrain)
 
 	return nil
 }
