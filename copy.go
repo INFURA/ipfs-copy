@@ -4,16 +4,15 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	ipfsPump "github.com/INFURA/ipfs-pump/pump"
+	ipfsCid "github.com/ipfs/go-cid"
+	ipfsShell "github.com/ipfs/go-ipfs-api"
+	rl "go.uber.org/ratelimit"
 	"io"
 	"log"
 	"strings"
 	"sync"
 	"sync/atomic"
-	"time"
-
-	ipfsPump "github.com/INFURA/ipfs-pump/pump"
-	ipfsCid "github.com/ipfs/go-cid"
-	ipfsShell "github.com/ipfs/go-ipfs-api"
 )
 
 // PinCIDsFromFile will open the file, read a CID from each line separated by LB char and pin them
@@ -128,20 +127,22 @@ func pinCIDs(cids <-chan ipfsCid.Cid, workers int, maxReqsPerSec int, infuraShel
 	successPinsCount = 0
 	failedPinsCount = 0
 
-	// 5 workers (by default) will be handling pinning of the entire file
+	rlm := rl.New(maxReqsPerSec)
+
 	var wg sync.WaitGroup
 	for w := 1; w <= workers; w++ {
 		wg.Add(1)
 		go func() {
 			for cid := range cids {
+				// Avoid getting rate limited
+				rlm.Take()
+
 				ok := pinCID(cid, infuraShell, failedPinsWriter)
 				if ok {
 					atomic.AddUint64(&successPinsCount, 1)
 				} else {
 					atomic.AddUint64(&failedPinsCount, 1)
 				}
-				// Avoid getting rate limited
-				time.Sleep(CalculateRateLimitDuration(maxReqsPerSec))
 			}
 			wg.Done()
 		}()
