@@ -14,7 +14,7 @@ import (
 
 const DefaultApiUrl = "https://ipfs.infura.io:5001"
 const DefaultWorkersCount = 20
-const DefaultMaxReqsPerSec = 10
+const DefaultMaxReqsPerSec = 50
 const Version = "1.3.0"
 
 type Config struct {
